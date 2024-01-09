@@ -1,0 +1,49 @@
+#+BEGIN_SRC bash
+#+END_SRC
+* CSC-271 project 1: linux mint web server
+For this project I will be installing apache onto a linux mint installation.
+
+* Update current linux mint packages
+#+BEGIN_SRC bash
+sudo apt update && apt upgrade -y
+#+END_SRC
+
+* Install packages I need
+#+BEGIN_SRC bash
+apt install apache2 apache2-doc apache2-utils emacs
+#+END_SRC
+
+* Remove the CUPS server
+#+BEGIN_SRC bash
+systemctl disable --now cups
+#+END_SRC
+
+* Add groups
+#+BEGIN_SRC bash
+groupadd developers
+groupadd editors
+#+END_SRC
+
+* Add Users
+#+BEGIN_SRC bash
+useradd --comment "Web Developer" \
+--create-home --pasword \
+--shell /bin/bash \
+--groups developers editors \
+webdev1
+
+useradd --comment "Content Editor" \
+--create-home \
+--gid editors \
+ceditor
+
+useradd --comment "Test User" \
+--no-create-home  testusr
+
+#+END_SRC
+
+* Assign directories to correct groups
+
+#+BEGIN_SRC bash
+chgrp --recursive /var/www editors
+#+END_SRC
