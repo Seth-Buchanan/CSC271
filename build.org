@@ -36,7 +36,10 @@ useradd --comment "Content Editor" \
 --create-home \
 --gid editors \
 ceditor
+#+END_SRC
 
+The test user will have read-only access to the server.
+#+BEGIN_SRC bash
 useradd --comment "Test User" \
 --no-create-home  testusr
 
