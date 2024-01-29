@@ -1,52 +1,86 @@
-#+BEGIN_SRC bash
-#+END_SRC
 * CSC-271 project 1: linux mint web server
-For this project I will be installing apache onto a linux mint installation.
+For this project I will be installing an Apache webserver onto a linux mint installation.
 
 * Update current linux mint packages
 #+BEGIN_SRC bash
-sudo apt update && apt upgrade -y
+apt update && apt upgrade
 #+END_SRC
 
 * Install packages I need
+The apache2 package will allow us to get a simple webserver going. apache2-utils will be used to get an https server going and finally any text editor.
 #+BEGIN_SRC bash
-apt install apache2 apache2-doc apache2-utils emacs
+apt install apache2 emacs
 #+END_SRC
 
 * Remove the CUPS server
+No need to have a printing service on a webserver.
 #+BEGIN_SRC bash
-systemctl disable --now cups
+systemctl stop cups
+
+systemctl disable cups
 #+END_SRC
+
+* Build that wall
+#+BEGIN_SRC bash
+  iptables -P INPUT DROP 		# Make default policy of INPUT chain to DROP
+
+  iptables -A INPUT \ 		# Append the following to INPUT chain
+	   -i enp1s0 \		# on the network interface enp1s0
+	   -p tcp \ 		# with TCP connections
+	   --dport 80 \		# on port 80
+	   -j ACCEPT		# accept the connection.
+#+END_SRC
+
 
 * Add groups
 #+BEGIN_SRC bash
-groupadd developers
 groupadd editors
 #+END_SRC
+For the assignment, we only need one group. This group's members will be able to edit the content served by apache. Users with more privledge will have be added to the sudo group and those with less privledge won't have either, only allowing them to edit their home directories if they have ones.
 
 * Add Users
+The first user I'll add is the web developer. This trusted account will be able to do anything and everything to the Linux Server. This account will also be given a generic password for them to change.
 #+BEGIN_SRC bash
 useradd --comment "Web Developer" \
---create-home --pasword \
---shell /bin/bash \
---groups developers editors \
-webdev1
+  --create-home \
+  --shell /bin/bash \
+  --groups sudo,editors \
+  webdev1
 
-useradd --comment "Content Editor" \
---create-home \
---gid editors \
-ceditor
+  passwd webdev1
 #+END_SRC
-
-The test user will have read-only access to the server.
-#+BEGIN_SRC bash
-useradd --comment "Test User" \
---no-create-home  testusr
-
-#+END_SRC
-
-* Assign directories to correct groups
+Next, the content editor will be added. The content editor will be able to write web page content and add pictures by editing the html.
 
 #+BEGIN_SRC bash
-chgrp --recursive /var/www editors
+  useradd --comment "Content Editor" \
+  --create-home \
+  --groups editors \
+  ceditor
+
+  passwd ceditor
 #+END_SRC
+
+Finally, the test user will be able to logon and walk around the server with read only access.
+#+BEGIN_SRC bash
+  useradd --comment "Test User" \
+  --shell /bin/bash \
+  --no-create-home  testusr
+
+  passwd testusr
+#+END_SRC
+
+* Content folder permissions
+Adding the content pages to groups will allow us to control who can edit them.
+#+BEGIN_SRC bash
+  chgrp --recursive editors /var/www 
+#+END_SRC
+I will then make it where only people in the same group as the file will be able to edit the files.
+#+BEGIN_SRC bash
+  chgrp chmod --recursive 775 /var/www
+#+END_SRC
+
+* Let's write some HTML
+For this assignment I will write some basic webpages.
+
+
+* Adding a Backup system
