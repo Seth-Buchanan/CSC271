@@ -9,7 +9,7 @@ apt update && apt upgrade
 * Install packages I need
 The apache2 package will allow us to get a simple webserver going. apache2-utils will be used to get an https server going and finally any text editor.
 #+BEGIN_SRC bash
-apt install apache2 emacs
+apt install apache2
 #+END_SRC
 
 * Remove the CUPS server
