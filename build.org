@@ -20,7 +20,7 @@ systemctl stop cups
 systemctl disable cups
 #+END_SRC
 
-* Build that wall
+* Build That Wall
 #+BEGIN_SRC bash
   iptables -P INPUT DROP 		# Make default policy of INPUT chain to DROP
 
@@ -32,7 +32,7 @@ systemctl disable cups
 #+END_SRC
 
 
-* Add groups
+* Add Groups
 #+BEGIN_SRC bash
 groupadd editors
 #+END_SRC
@@ -54,6 +54,7 @@ Next, the content editor will be added. The content editor will be able to write
 #+BEGIN_SRC bash
   useradd --comment "Content Editor" \
   --create-home \
+  --shell /bin/bash \
   --groups editors \
   ceditor
 
@@ -72,15 +73,91 @@ Finally, the test user will be able to logon and walk around the server with rea
 * Content folder permissions
 Adding the content pages to groups will allow us to control who can edit them.
 #+BEGIN_SRC bash
-  chgrp --recursive editors /var/www 
+  chgrp --recursive editors /var/www
 #+END_SRC
 I will then make it where only people in the same group as the file will be able to edit the files.
 #+BEGIN_SRC bash
   chgrp chmod --recursive 775 /var/www
 #+END_SRC
 
-* Let's write some HTML
-For this assignment I will write some basic webpages.
 
 
-* Adding a Backup system
+* Adding a Backup System
+For this assigment, I have two seperate partitions that I care about. The first is /var/html and the second is the root partition. So I will make a script that backs them up.
+
+** BUT FIRST!
+The backup that I am doing requrires an ssh connection. So to handle authentication I will use a key pair.
+#+BEGIN_SRC bash
+  su
+#+END_SRC
+It is important that I make the key as root so systemd can use the keys.
+#+BEGIN_SRC bash
+  ssh-keygen
+#+END_SRC
+Is the command that creates a public and private key for ssh authentication. The private key stays on the client machine and the public key is appended to the ~/.ssh/authorized_keys file in the user that will be getting logged into on the server.
+
+** Script Time
+The following is the script for backing up the webserver content.
+/opt/backup:
+#+BEGIN_SRC bash
+#!/usr/bin/env bash
+
+cd /
+WEB_CONTENT="./var/www/html"
+BACKUP_SERVER="seth@10.90.31.127" # current IP of backup server as of demo
+# Full path of new backup file
+BACKUP_DEST="/home/seth/backups/`date +"content-backup-%Y-%m-%d.tar.gz"`"
+
+# This zips the file and sends it to the backup server without
+# making a local copy.
+tar --preserve-permissions \
+    --gzip --create --file=- \
+    $WEB_CONTENT | ssh $BACKUP_SERVER "cat > $BACKUP_DEST"
+
+BACKUP_DEST="/home/seth/backups/`date +"server-backup-%Y-%m-%d.tar.gz"`"
+
+tar --preserve-permissions \
+    --gzip --create \
+    --exclude=$WEB_CONTENT \
+    --exclude=/proc \
+    --exclude=/dev \
+    --exclude=/mnt \
+    --exclude=/run \
+    --file=- / \
+    | ssh $BACKUP_SERVER "cat > $BACKUP_DEST"
+
+#+END_SRC
+
+** Systemd Timer Time
+
+Here is the systemd service that runs the backup script
+/etc/systemd/system/backup.service:
+#+BEGIN_SRC
+[Unit]
+Description=System backup script
+
+[Service]
+Type=oneshot
+ExecStart=/opt/backup
+
+#+END_SRC
+
+This would be usless without a systemd timer to run the service file.
+/etc/systemd/system/backup.timer:
+#+BEGIN_SRC
+[Unit]
+Description=System backup script timer
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+#+END_SRC
+We don't need this script to be run on startup. Only once a week. Therefore I will only start the service, not enable it.
+
+#+BEGIN_SRC bash
+systemctl daemon-reload
+systemctl start backup
+#+END_SRC
