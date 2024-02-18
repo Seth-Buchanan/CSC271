@@ -1,0 +1,37 @@
+* CSC-271 project 2: Bind9 on Ubuntu Server
+
+This time, I will be installing bind9 dns on Ubuntu Server.
+
+** Getting set up
+For this guide I will start after Ubunutu server has been installed. 
+#+BEGIN_SRC bash
+apt update && apt upgrade
+#+END_SRC
+This will update our URL database of the packages in the apt repositories and upgrade them for pain free package installation.
+
+** Installing Bind
+#+BEGIN_SRC bash
+apt install bind9 bind9utils bind9-doc
+#+END_SRC
+The first of these packages is the Bind binary, default configuration files and systemd service file that will be running bind dns on startup and is all we really need. The second is bind9utils, this is a package of old timey domain name commands like nslookup, dig and host. The basic thing these things do is resolve hostnames into IP addresses and gives you the IP of the dns that was used to resolve it.
+
+** Setting to IPv4 mode
+#+NAME:   fig:SED-HR4049
+[[./img/bad joke.jpg]]
+
+Therefore we Launch Bind in IPv4 mode. This is done by adding the ~-4~ option to the command that launches bind.
+
+#+CAPTION: /etc/default/named
+#+BEGIN_SRC
+#
+# run resolvconf?
+
+#startup options for the server
+OPTIONS="-u bind -4"
+#+END_SRC
+
+After this change we will have to restart the dns service in systemd.
+#+BEGIN_SRC bash
+systemctl restart bind9
+#+END_SRC
+
