@@ -11,27 +11,108 @@ This will update our URL database of the packages in the apt repositories and up
 
 ** Installing Bind
 #+BEGIN_SRC bash
-apt install bind9 bind9utils bind9-doc
+apt install bind9 bind9utils 
 #+END_SRC
 The first of these packages is the Bind binary, default configuration files and systemd service file that will be running bind dns on startup and is all we really need. The second is bind9utils, this is a package of old timey domain name commands like nslookup, dig and host. The basic thing these things do is resolve hostnames into IP addresses and gives you the IP of the dns that was used to resolve it.
 
-** Setting to IPv4 mode
-#+NAME:   fig:SED-HR4049
-[[./img/bad joke.jpg]]
-
-Therefore we Launch Bind in IPv4 mode. This is done by adding the ~-4~ option to the command that launches bind.
-
-#+CAPTION: /etc/default/named
-#+BEGIN_SRC
-#
-# run resolvconf?
-
-#startup options for the server
-OPTIONS="-u bind -4"
+** Configuring Bind
+All in /etc/bind/named.conf.local to make bind do a few things. The first is setting bind to listen on port 53.
+#+BEGIN_SRC conf
+listen-on port 53 { 127.0.0.1; 192.0.2.1; };
+listen-on-v6 port 53 { ::1; 2001:db8:1::1; };
 #+END_SRC
 
-After this change we will have to restart the dns service in systemd.
+Next we will specify the ports that will allow queries and allow recursive queries. Be sure to not allow bind to recursivly resolve public facing DNS queries to keep from participating in a DNS amplification attack on a computer.
+#+BEGIN_SRC conf
+allow-query { localhost; 192.0.2.0/24; 2001:db8:1::/64; };
+allow-recursion { localhost; 192.0.2.0/24; 2001:db8:1::/64; };
+#+END_SRC
+
+Then we will specify the DNS that Bind will foward dns reqests to when it is not stored in the cache or one that we put into bind.
+#+BEGIN_SRC conf
+fowarders { 8.8.8.8; 8.8.4.4; };
+#+END_SRC
+
+** Enabling Bind
+Allow bind to start on system startup
 #+BEGIN_SRC bash
-systemctl restart bind9
+  systemctl enable bind
 #+END_SRC
+As well as right now
+#+BEGIN_SRC bash
+  systemctl start bind
+#+END_SRC
+
+* Adding a Backup System
+
+** SSH keys
+ For authentication, we will give the root user that will be running the script ssh keys.
+#+BEGIN_SRC bash
+  su
+  ssh-keygen
+#+END_SRC
+ssh-keygen is the command that creates a public and private key for ssh authentication. The private key stays on the client machine and the public key is appended to the ~/.ssh/authorized_keys file in the user that will be getting logged into on the server.
+
+** Script Time
+The following is the script for backing up the dns configuration.
+/opt/backup:
+#+BEGIN_SRC bash
+#!/usr/bin/env bash
+
+cd /
+DNS_CONF="./etc/bind"
+BACKUP_SERVER="seth@192.168.122.1" # IP of host computer in virt-manager
+# Full path of new backup file
+BACKUP_DEST="/home/seth/backups/`date +"dns-conf-%Y-%m-%d.tar.gz"`"
+
+# This zips the file and sends it to the backup server without
+# making a local copy.
+tar --preserve-permissions \
+    --gzip --create --file=- \
+    $DNS_CONF | ssh $BACKUP_SERVER "cat > $BACKUP_DEST"
+#+END_SRC
+
+** Systemd service/timer
+
+Here is the systemd service that runs the backup script
+/etc/systemd/system/backup.service:
+#+BEGIN_SRC
+[Unit]
+Description=System backup script
+
+[Service]
+Type=oneshot
+ExecStart=/opt/backup
+
+[Install]
+WantedBy=default.target
+
+#+END_SRC
+
+This would be usless without a systemd timer to run the service file.
+/etc/systemd/system/backup.timer:
+#+BEGIN_SRC
+[Unit]
+Description=System backup script timer
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+#+END_SRC
+To allow this script to run when we need it we have to enable it.
+
+#+BEGIN_SRC bash
+systemctl daemon-reload
+systemctl enable backup
+#+END_SRC
+
+If we wanted to run the backup script manually we can run.
+
+#+BEGIN_SRC bash
+systemctl start backup
+#+END_SRC
+
 
