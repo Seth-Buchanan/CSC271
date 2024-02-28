@@ -75,7 +75,7 @@ As well as right now
 From there we should have a functional dns server. We would add a map of hostnames to IPs on our local network and be able to reference them by hostname
 
 * Adding a dns editor account
-This will make a group "dnseds" that can edit the dns settings. Then add a user dnsed that can edit files in that group. After that, we will recursivly change the permissions of the bind config files to allow group members full access to those files. Then, we also recursivly change the group of the files starting at /etc/bind. The we will add our admin account "bigcheese" that reserves access to the wheel group, to the dnseds group.
+This will make a group "dnseds" that can edit the dns settings. Then add a user dnsed that can edit files in that group. After that, we will recursivly change the permissions of the bind config files to allow group members full access to those files. Then, we also recursively change the group of the files starting at /etc/bind. The we will add our admin account "bigcheese" that reserves access to the wheel group, to the dnseds group.
 #+BEGIN_SRC bash
   groupadd dnseds
   useradd -m  -g dnseds -G dnsed
