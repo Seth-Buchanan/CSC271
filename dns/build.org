@@ -3,7 +3,7 @@
 This time, I will be installing bind9 dns on Ubuntu Server.
 
 ** Getting set up
-For this guide I will start after Ubunutu server has been installed. 
+For this guide I will start after Ubuntu server has been installed. 
 #+BEGIN_SRC bash
 apt update && apt upgrade
 #+END_SRC
@@ -13,25 +13,54 @@ This will update our URL database of the packages in the apt repositories and up
 #+BEGIN_SRC bash
 apt install bind9 bind9utils 
 #+END_SRC
-The first of these packages is the Bind binary, default configuration files and systemd service file that will be running bind dns on startup and is all we really need. The second is bind9utils, this is a package of old timey domain name commands like nslookup, dig and host. The basic thing these things do is resolve hostnames into IP addresses and gives you the IP of the dns that was used to resolve it.
+The first of these packages is the Bind binary, default configuration files and systemd service file that will be running bind dns on startup and is all we really need. The second is bind9utils, this is a package of old-timey domain name commands like nslookup, dig and host. The basic thing these things do is resolve hostnames into IP addresses and gives you the IP of the dns that was used to resolve it.
 
 ** Configuring Bind
 All in /etc/bind/named.conf.local to make bind do a few things. The first is setting bind to listen on port 53.
 #+BEGIN_SRC conf
-listen-on port 53 { 127.0.0.1; 192.0.2.1; };
+listen-on port 53 { 127.0.0.1; 192.168.253.135/24; };
 listen-on-v6 port 53 { ::1; 2001:db8:1::1; };
 #+END_SRC
 
-Next we will specify the ports that will allow queries and allow recursive queries. Be sure to not allow bind to recursivly resolve public facing DNS queries to keep from participating in a DNS amplification attack on a computer.
+Now we will specify the ranges of IPs that we will perform recursive queries for. If this dns server was public facing, we would only allow the public IPs to make normal queries.
 #+BEGIN_SRC conf
-allow-query { localhost; 192.0.2.0/24; 2001:db8:1::/64; };
-allow-recursion { localhost; 192.0.2.0/24; 2001:db8:1::/64; };
+allow-recursion { 127.0.0.1; 192.168.253.0/24; };
 #+END_SRC
 
-Then we will specify the DNS that Bind will foward dns reqests to when it is not stored in the cache or one that we put into bind.
+Then we will specify the DNS that Bind will forward dns requests to when it is not stored in the cache or one that we put into bind.
 #+BEGIN_SRC conf
 fowarders { 8.8.8.8; 8.8.4.4; };
 #+END_SRC
+
+Now to specify a zone. Host names in this "test.foo" domain will be able to be resolved by us. The mappings of domain names will be stored in it's specified zone file.
+#+BEGIN_SRC conf
+zone "test.foo" {
+        type master;
+        file "/etc/bind/zones/test.foo.db";
+        notify no;
+};
+#+END_SRC
+This is the zone file that specifies the IPs of the hostnames in the zone. This config maps ns.test.foo to 192.168.253.133
+/etc/bind/zones/test.foo.db:
+#+BEGIN_SRC
+;
+; BIND data file for local loopback interface
+;
+$TTL    604800
+@       IN      SOA     ns.test.foo. root.test.foo. (
+                              1         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@       IN      NS      ns.test.foo
+ns      IN      A       192.168.253.133
+
+;also list other computers
+#+END_SRC
+
+
 
 ** Enabling Bind
 Allow bind to start on system startup
@@ -41,6 +70,18 @@ Allow bind to start on system startup
 As well as right now
 #+BEGIN_SRC bash
   systemctl start bind
+#+END_SRC
+
+From there we should have a functional dns server. We would add a map of hostnames to IPs on our local network and be able to reference them by hostname
+
+* Adding a dns editor account
+This will make a group "dnseds" that can edit the dns settings. Then add a user dnsed that can edit files in that group. After that, we will recursivly change the permissions of the bind config files to allow group members full access to those files. Then, we also recursivly change the group of the files starting at /etc/bind. The we will add our admin account "bigcheese" that reserves access to the wheel group, to the dnseds group.
+#+BEGIN_SRC bash
+  groupadd dnseds
+  useradd -m  -g dnseds -G dnsed
+  chmod 775 -R /etc/bind
+  chgrp -R dnseds
+  usermod -aG bigcheese dnseds
 #+END_SRC
 
 * Adding a Backup System
@@ -89,7 +130,7 @@ WantedBy=default.target
 
 #+END_SRC
 
-This would be usless without a systemd timer to run the service file.
+This would be useless without a systemd timer to run the service file.
 /etc/systemd/system/backup.timer:
 #+BEGIN_SRC
 [Unit]
